@@ -25,11 +25,17 @@ keygen:
 # Build the sealed host image (composefs backend with signed UKI).
 # If no persistent key exists under target/keys/, an ephemeral key+cert pair
 # is generated automatically (suitable for CI and local smoke-testing).
+# Set BASE_IMAGE to override the base image, e.g. to build against
+# quay.io/centos-bootc/centos-bootc:stream10 without a RHEL subscription.
 build:
     #!/bin/bash
     set -euo pipefail
     KEY="{{keys_dir}}/sb-db.key"
     CERT="keys/db.crt"
+    build_args=()
+    if [ -n "${BASE_IMAGE:-}" ]; then
+        build_args+=(--build-arg "base=${BASE_IMAGE}")
+    fi
 
     if [ ! -f "${KEY}" ]; then
         echo "No persistent key found — generating ephemeral key+cert for this build."
@@ -41,7 +47,7 @@ build:
 
     # build-rootfs runs `rpm-ostree compose` under bwrap, which needs extra
     # capabilities and /dev/fuse. The composefs/UKI build also uses fuse.
-    podman build \
+    podman build "${build_args[@]}" \
         --cap-add=all --security-opt=label=type:container_runtime_t --device /dev/fuse \
         --secret id=secureboot_key,src="${KEY}" \
         --secret id=secureboot_cert,src="${CERT}" \
