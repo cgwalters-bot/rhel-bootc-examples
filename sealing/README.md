@@ -37,6 +37,18 @@ Building from the RHEL base image needs a subscribed host and a login to
 registry.redhat.io. To try it without one, build against CentOS Stream 10
 instead with `BASE_IMAGE=quay.io/centos-bootc/centos-bootc:stream10 just bcvk-ssh`.
 
+### bootc from git
+
+To try unreleased bootc changes on CentOS Stream 10, build bootc RPMs from
+git (the commit pinned in [../bootc-git/commit](../bootc-git/commit)) and
+pass them in; they replace bootc both in the sealed image and in the stage
+that computes the composefs digest:
+
+```sh
+export BASE_IMAGE=quay.io/centos-bootc/centos-bootc:stream10
+BOOTC_RPMS=$(just ../bootc-rpms) just bcvk-ssh
+```
+
 ### 3. Manual exploration
 
 The `Justfile` is a relatively straightforward wrapper for `podman build` to generate the container image, and `bcvk` to run it as a local VM.

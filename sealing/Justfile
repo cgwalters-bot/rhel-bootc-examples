@@ -7,7 +7,7 @@
 # For VM testing: bcvk (from bootc-dev/bcvk), virt-firmware (pip)
 
 # Local image name
-host_image := "localhost/sealed-host:latest"
+host_image := env("HOST_IMAGE", "localhost/sealed-host:latest")
 
 # Key material directory (for local dev; CI uses secrets)
 keys_dir := justfile_directory() + "/target/keys"
@@ -26,7 +26,9 @@ keygen:
 # If no persistent key exists under target/keys/, an ephemeral key+cert pair
 # is generated automatically (suitable for CI and local smoke-testing).
 # Set BASE_IMAGE to override the base image, e.g. to build against
-# quay.io/centos-bootc/centos-bootc:stream10 without a RHEL subscription.
+# quay.io/centos-bootc/centos-bootc:stream10 without a RHEL subscription,
+# BOOTC_RPMS to use bootc built from git (see ../bootc-git), EXTRA_PACKAGES to
+# add packages, and HOST_IMAGE to tag the result differently.
 build:
     #!/bin/bash
     set -euo pipefail
@@ -36,6 +38,13 @@ build:
     build_args=()
     if [ -n "${BASE_IMAGE:-}" ]; then
         build_args+=(--build-arg "base=${BASE_IMAGE}")
+    fi
+    # bootc RPMs built from git, e.g. BOOTC_RPMS=$(just ../bootc-rpms)
+    if [ -n "${BOOTC_RPMS:-}" ]; then
+        build_args+=(--build-arg "bootc_rpms=${BOOTC_RPMS}")
+    fi
+    if [ -n "${EXTRA_PACKAGES:-}" ]; then
+        build_args+=(--build-arg "extra_packages=${EXTRA_PACKAGES}")
     fi
 
     if [ ! -f "${KEY}" ]; then
