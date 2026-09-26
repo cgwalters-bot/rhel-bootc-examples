@@ -28,3 +28,8 @@ bootc-rpms:
 # Pin bootc-git to the current head of bootc and the current buildroot image.
 bootc-git-bump:
     @just --justfile bootc-git/Justfile --working-directory bootc-git bump
+
+# Build, lint, make a qcow2 with image-builder, boot, switch and upgrade
+# a composefs example (sealed or unsealed); see tests/composefs_e2e.py.
+e2e variant:
+    tests/composefs_e2e.py {{variant}}
