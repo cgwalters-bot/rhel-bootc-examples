@@ -1,0 +1,79 @@
+name: Build composefs examples with bootc from git
+
+# Builds the composefs examples (sealing and composefs) on CentOS Stream 10
+# with bootc built from the commit pinned in bootc-git/commit, and lints the
+# results. Booting them from a disk image made by image-builder needs KVM and
+# is covered by `just e2e sealed|unsealed` (tests/composefs_e2e.py), which is
+# run by hand.
+
+on:
+  pull_request:
+    paths:
+      - 'bootc-git/**'
+      - 'composefs/**'
+      - 'sealing/**'
+      - 'tests/**'
+      - 'Justfile'
+      - '.github/workflows/build-composefs-git.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'bootc-git/**'
+      - 'composefs/**'
+      - 'sealing/**'
+      - 'tests/**'
+      - 'Justfile'
+      - '.github/workflows/build-composefs-git.yml'
+  # Weekly, so that breakage from new CentOS Stream content is noticed: the
+  # example base images float on purpose (unlike the bootc buildroot).
+  schedule:
+    - cron: '47 4 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  BASE_IMAGE: quay.io/centos-bootc/centos-bootc:stream10
+
+jobs:
+  build:
+    # Only run the scheduled build upstream, not in forks.
+    if: github.event_name != 'schedule' || github.repository_owner == 'redhat-cop'
+    name: Build and lint
+    runs-on: ubuntu-latest
+    container:
+      image: registry.access.redhat.com/ubi10/ubi
+      options: --privileged --volume /var
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+          dnf -y install podman just openssl
+
+      - name: Build bootc RPMs from git
+        run: echo "BOOTC_RPMS=$(just bootc-rpms)" >> "${GITHUB_ENV}"
+
+      - name: Build and lint the sealed example
+        working-directory: sealing
+        run: |
+          HOST_IMAGE=localhost/sealed-host:latest just build
+          podman run --rm --network=none localhost/sealed-host:latest bootc container lint --fatal-warnings
+
+      - name: Build and lint the unsealed composefs example
+        working-directory: composefs
+        run: |
+          HOST_IMAGE=localhost/composefs-host:latest just build
+          podman run --rm --network=none localhost/composefs-host:latest bootc container lint --fatal-warnings
+
+      - name: Show the bootc version
+        run: podman run --rm localhost/composefs-host:latest rpm -q bootc
+
+      - name: Clean up keys
+        if: always()
+        run: rm -rf sealing/target/keys
