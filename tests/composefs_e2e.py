@@ -50,6 +50,8 @@ REGISTRY_IMAGE = "docker.io/library/registry:2"
 BUILD_PACKAGES = {1: [], 2: ["strace"], 3: ["strace", "tmux"]}
 # EFI global variable GUID, also used as the owner of the enrolled certificates
 EFI_GLOBAL_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
+# Discoverable Partitions Specification root type for x86-64
+DPS_ROOT_X86_64 = "4f68bce3-e8cd-4db1-96e7-fbcaf984b709"
 # Where distributions install OVMF, and the (code, vars) file names they use
 OVMF_DIRS = ["/usr/share/edk2/ovmf", "/usr/share/OVMF", "/usr/share/edk2/x64"]
 OVMF_SECURE = [("OVMF_CODE.secboot.fd", "OVMF_VARS.secboot.fd"),
@@ -340,6 +342,14 @@ find {store}/out -name '*.qcow2' -exec cp --sparse=always {{}} {w}/out/ \\;
         opts = self.ssh("findmnt -n -o OPTIONS /", capture=True).stdout
         if "verity=require" not in opts:
             raise E2EError(f"/ isn't a verity-checked composefs mount: {opts.strip()}")
+        self.ssh("lsblk -o NAME,SIZE,PARTTYPE,PARTTYPENAME,FSTYPE,MOUNTPOINTS")
+        parttype = self.ssh("lsblk -n -o PARTTYPE \"$(findmnt -n -o SOURCE -T /sysroot)\"",
+                            capture=True).stdout.strip().lower()
+        log(f"root partition type: {parttype}")
+        # image-builder gives only UKI images the DPS root type (which gpt-auto needs
+        # without root=); a BLS image's command line has root=.
+        if self.sealed and parttype != DPS_ROOT_X86_64:
+            raise E2EError(f"the root partition type is {parttype}, not DPS {DPS_ROOT_X86_64}")
         if self.sealed:
             sb = self.ssh(f"od -An -t u1 -j4 -N1 /sys/firmware/efi/efivars/SecureBoot-{EFI_GLOBAL_GUID}",
                           capture=True).stdout.split()
