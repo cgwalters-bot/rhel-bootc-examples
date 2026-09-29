@@ -67,6 +67,7 @@ build:
         --cap-add=all --security-opt=label=type:container_runtime_t --device /dev/fuse \
         --secret id=secureboot_key,src="${KEY}" \
         --build-context secureboot="${CERT_DIR}" \
+        --build-context baseimages="${BASE_IMAGES_DIR}" \
         -t "{{host_image}}" .
     echo "Host image built: {{host_image}}"
 
