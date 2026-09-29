@@ -21,6 +21,8 @@ Environment:
                   SEALED_IB_REQUIREMENT)
   E2E_WORKDIR     where logs and disk images go (default: target/e2e-<variant>)
   E2E_REGISTRY_PORT, E2E_SSH_PORT  host ports to use (default: 5000, 2222)
+  E2E_SUFFIX      appended to the image and registry container names, for
+                  running several tests at once
   COMPOSEFS_BACKEND_CONFIG  passed on to composefs/Justfile (unsealed only)
 """
 
@@ -111,7 +113,9 @@ class Test:
         self.variant = variant
         self.sealed = variant == "sealed"
         self.example = TOPDIR / EXAMPLES[variant]
-        self.image = f"localhost/{EXAMPLES[variant]}-e2e"
+        # Distinguishes the images and registry of concurrent runs
+        suffix = os.environ.get("E2E_SUFFIX", "")
+        self.image = f"localhost/{EXAMPLES[variant]}-e2e{suffix}"
         self.workdir = Path(os.environ.get("E2E_WORKDIR", TOPDIR / "target" / f"e2e-{variant}"))
         self.base_image = os.environ.get("BASE_IMAGE", DEFAULT_BASE_IMAGE)
         self.ib_image = os.environ.get("IB_IMAGE")
@@ -120,7 +124,7 @@ class Test:
                 raise E2EError(SEALED_IB_REQUIREMENT)
             self.ib_image = DEFAULT_IB_IMAGE
         self.registry_port = int(os.environ.get("E2E_REGISTRY_PORT", "5000"))
-        self.registry_name = f"composefs-e2e-registry-{variant}"
+        self.registry_name = f"composefs-e2e-registry-{variant}{suffix}"
         # How the guest reaches the host with QEMU's user networking
         self.registry = f"10.0.2.2:{self.registry_port}"
         self.target_ref = f"{self.registry}/e2e:latest"
